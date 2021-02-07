@@ -1,0 +1,162 @@
+---
+title: "RF and SVM"
+author: "Myunggeon"
+date: '2020 6 27 '
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## 1. RandomForest
+### int -> factor
+```{r}
+library(randomForest)
+library(C50)
+library(caret)
+library(xtable)
+library(e1071)
+library(kernlab)
+library(ROCR)
+library(dplyr)
+library(kernlab)
+
+data_lol <- read.csv("C:/LOL_Revised1.csv")
+data_lol <-data_lol %>% select(-(gameId:gameDuration))
+
+set.seed(1234)
+SL=sample(1:nrow(data_lol),nrow(data_lol)*0.7,replace=FALSE)
+str(data_lol)
+data_lol$hasWon=as.factor(data_lol$hasWon)
+tmp<-c(3:21)
+tmp1<-c(62:157)
+
+
+for (i in tmp) {
+
+data_lol[,i] <- as.factor(data_lol[,i])
+}
+
+for (i in tmp1) {
+
+data_lol[,i] <- as.factor(data_lol[,i])
+}
+
+Train <- data_lol[SL,]
+Test <- data_lol[-SL,]
+
+Feature <- Train[,-1]
+Response <- Train[,1]
+
+rf.fit = randomForest(hasWon ~ .
+                      , data=Train,
+                      mtry = sqrt(237), ntree = 500,
+                      importance = T)
+
+y_pred = predict(rf.fit, Test)
+
+confusionMatrix(y_pred, Test$hasWon)
+
+importance(rf.fit)
+varImpPlot(rf.fit, type=2, pch=19, col=1, cex=1, main="")
+
+head(rf.fit$err.rate)
+plot(rf.fit$err.rate[,1],col='red')
+
+plot(rf.fit, main="random Forest model")
+legend("topright", c("worst","overall","best"), fill = c("green", "black", "red"))
+y_pred
+y_pred_prob<- predict(rf.fit, Test, type="prob")
+rf_pred <- prediction(y_pred_prob[,2],Test$hasWon)
+
+#ROC
+rf_model.perf1 <- performance(rf_pred, "tpr", "fpr")
+plot(rf_model.perf1, colorize=TRUE); abline(a=0, b=1, lty=3)  # ROC-chart
+
+#Lift
+rf_model.perf2 <- performance(rf_pred, "lift", "rpp")
+plot(rf_model.perf2, colorize=TRUE); abline(v=0.5, lty=3)     # Lift chart
+
+performance(rf_pred, "auc")@y.values[[1]]
+```
+## 2 SVM
+### 전처리
+### 변수 정규화
+
+```{r}
+
+
+str(data_lol)
+tmp<-c(3:21)
+tmp1<-c(62:157)
+for (i in tmp) {
+ 
+
+  data_lol[,i] <- as.factor(data_lol[,i])
+}
+
+for (i in tmp1) {
+ 
+ 
+  data_lol[,i] <- as.factor(data_lol[,i])
+}
+data_lol[,157]
+
+scale.features <- function(df, variables) {
+  for (variable in variables) {
+    df[[variable]] <- scale(df[[variable]], center = T, scale=T)
+  }
+  return(df)
+}
+data_lol[[220]]
+```
+## 전처리
+### svm 을 위한 변수 scaling ( 사용자정의함수 사용)
+### Numeric Variable Scailing(0~1)
+```{r}
+
+
+scale.features <- function(df, variables) {
+ for (variable in variables) {
+ df[[variable]] <- scale(df[[variable]], center = T, scale=T)
+ }
+ return(df)
+}
+
+numeric.vars <- c(22:61)
+numeric.vars2 <- c(158:237)
+data_lolt <- scale.features(data_lol, numeric.vars)
+data_lol <- scale.features(data_lolt, numeric.vars2)
+#Train Test 0.7,0.3(RandomForest 와 동일)
+Train=data_lol[SL,]
+Test=data_lol[-SL,]
+```
+### find best gamma and cost
+```{r}
+#result <- tune.svm(hasWon~., data=Train, gamma=c(0.001,0.01,0.1), cost=c(1,10,100,1000))
+#result
+```
+### predict and ROC curve
+```{r}
+svm_model <- ksvm(hasWon~., data = Train, kernel = "rbfdot",
+ kpar = list(sigma = 0.001),
+ C = 10, cross = 10 ,prob.model=TRUE)
+
+hat.y <- predict(svm_model, Test)
+confusionMatrix(hat.y, Test$hasWon)
+
+hat.yy <- predict(svm_model, Test,type="probabilities")
+
+y_pred
+svm_pred <- prediction(hat.yy[,2],Test$hasWon)
+svm_model.perf1 <- performance(svm_pred, "tpr", "fpr")
+plot(svm_model.perf1, colorize=TRUE); abline(a=0, b=1, lty=3) # ROC-chart
+performance(svm_pred, "auc")@y.values[[1]]
+
+```
+

@@ -1,0 +1,634 @@
+---
+title: "EDA part"
+author: "Myunggeon"
+date: '2020 6 27 '
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(broom)
+library(knitr)
+library(ggfortify)
+library(readr)
+library(dplyr)
+data_lol <- read_csv("C:/lol_ranked_games.csv")
+
+length(unique(data_lol$gameId)) # Total 24912 games
+data_win <- data_lol %>% group_by(gameId,hasWon) %>% summarise(sum(hasWon)) 
+sum(data_win$hasWon==1) # 12539 wins 50.33%
+sum(data_win$hasWon==0) # 12373 loses 49.67%
+
+###
+#Blue win:   12539 games
+#Pulple win: 12373 games
+###
+
+#num->fac
+data_lol[,'hasWon'] <- lapply(data_lol[,'hasWon'],as.factor)
+data_lol[,'isFirstTower'] <- lapply(data_lol[,'isFirstTower'],as.factor)
+data_lol[,'isFirstBlood'] <- lapply(data_lol[,'isFirstBlood'],as.factor)
+
+str(data_lol)
+
+#EDA
+str(data_lol)
+# 242572 X 59 datas
+
+d_f <- data_lol %>% group_by(gameId) %>% summarise(mf=max(frame))
+mean(d_f$mf)
+d_fl <- data_lol %>% filter(hasWon==0) %>% group_by(gameId) %>% summarise(mf=max(frame)) %>% arrange(desc(mf))
+
+d_fl %>% group_by(mf) %>% summarise(n=n()) %>% arrange(desc(mf)) %>% ggplot(aes(x=mf,y=n)) + geom_bar(stat="identity")
+
+d_fw <- data_lol %>% filter(hasWon==1) %>% group_by(gameId) %>% summarise(mf=max(frame))
+mean(d_fw$mf)
+
+
+###
+#Average 27.5 min
+#Win: 27.27
+#Lose:27.68
+###
+
+#의미 x
+data_fb <- data_lol %>% filter(hasWon==1 & isFirstBlood==1) %>% group_by(gameId) %>% summarise(mf=min(frame))
+
+mean(data_fb$mf)
+
+###
+#Average 10.007975
+###
+
+data_fb <- data_lol %>% filter(hasWon==0 & isFirstBlood==1) %>% group_by(gameId) %>% summarise(mf=min(frame))
+
+mean(data_fb$mf)
+###
+#Average 10.04
+###
+#------------------------------------------------------------------------------------------------------
+
+data_ft <- data_lol %>% filter(hasWon==1 & isFirstTower==1) %>% group_by(gameId) %>% summarise(mf=min(frame))
+
+mean(data_ft$mf)
+
+###
+#Win
+#Average 15.502359
+###
+
+data_ft2 <- data_lol %>% filter(hasWon==0 & isFirstTower==1) %>% group_by(gameId) %>% summarise(mf=min(frame))
+data_lol
+mean(data_ft2$mf)
+###
+#Lose
+#Average 17.173668
+###
+#------------------------------------------------------------------------------------------------------
+
+#1) gold and exp
+data_normal <- data_lol %>% select(gameId,frame,hasWon,goldDiff,expDiff,champLevelDiff)
+# by frame
+#gold
+data_normal %>% group_by(frame,hasWon)  %>% summarise(m_g=mean(goldDiff)) %>%
+  ggplot(aes(x=frame,y=m_g,fill=hasWon)) +
+  geom_bar(stat = "identity")
+
+
+data_normal %>% group_by(frame)
+
+
+#exp
+data_normal %>% group_by(frame,hasWon)  %>% summarise(m_e=mean(expDiff)) %>%
+  ggplot(aes(x=frame,y=m_e,fill=hasWon)) +
+  geom_bar(stat = "identity")
+
+#Level
+data_normal %>% group_by(frame,hasWon)  %>% summarise(m_c=mean(champLevelDiff)) %>%
+  ggplot(aes(x=frame,y=m_c,fill=hasWon)) +
+  geom_bar(stat = "identity")
+
+#------------------------------------------------------------------------------------------------------
+
+#2) Epic Monster
+#(1) kill
+data_drake <- read.csv("C:/LOL_Numeric.csv")
+data_drake <- data_lol %>% select(gameId,frame,hasWon,killedFireDrake:lostRiftHerald) %>% mutate(killedTotaldrake=killedFireDrake+killedWaterDrake+killedAirDrake+killedEarthDrake)
+
+
+#win vs lose killedTotaldrake
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_T=max(killedTotaldrake)) %>% group_by(x_T,hasWon) %>% summarise(n_T=n())%>%
+  ggplot(aes(x=x_T,y=n_T)) +
+  geom_bar(stat = "identity")+
+facet_wrap(~ hasWon, ncol = 2)
+
+# elder drake
+data_drake %>% group_by(killedElderDrake,gameId) %>% summarise() %>% summarise(n())
+###
+
+#Elder drake
+#not be killed: 24912 
+#so, visualization except 'not be killed' for visual convenience.
+###
+
+data_drake %>% filter(killedElderDrake==4) %>% group_by(gameId,hasWon) %>% summarise(x_E=max(killedElderDrake))
+data_drake %>% filter(killedElderDrake==1) %>% group_by(gameId,hasWon) %>% summarise(x_E=max(killedElderDrake)) %>% group_by(x_E,hasWon) %>% summarise(n_E=n())%>%
+  ggplot(aes(x=x_E,y=n_E)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+
+###
+#    e  hasWon    n_E
+#  <dbl> <fct>  <int>
+#1     1 0        118
+#2     1 1        453
+#3     2 0          5
+#4     2 1         22
+#5     3 1          3
+###
+
+#Baron
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_N=max(killedBaronNashor)) %>% group_by(x_N,hasWon) %>% summarise(n_N=n())%>%
+  ggplot(aes(x=x_N,y=n_N)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+
+
+#Riftherreld
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_R=max(killedRiftHerald)) %>% group_by(x_R,hasWon) %>% summarise(n_R=n())%>%
+  ggplot(aes(x=x_R,y=n_R)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ hasWon, ncol = 2)
+
+
+#(2) lost
+data_drake <- data_drake %>% select(gameId,frame,hasWon,killedFireDrake:lostRiftHerald) %>% mutate(lostTotaldrake=lostFireDrake+lostWaterDrake+lostAirDrake+lostEarthDrake)
+
+
+#win vs lose lostTotaldrake
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_T=max(lostTotaldrake)) %>% group_by(x_T,hasWon) %>% summarise(n_T=n())%>%
+  ggplot(aes(x=x_T,y=n_T)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+
+# elder drake
+data_drake %>% group_by(lostElderDrake,gameId) %>% summarise() %>% summarise(n())
+
+###
+
+#Elder drake
+#not be lost: 24912 
+#so, visualization except 'not be lost' for visual convenience.
+
+###
+
+data_drake %>% filter(lostElderDrake==0) %>% group_by(gameId,hasWon) %>% summarise(x_E=max(lostElderDrake)) %>% group_by(x_E,hasWon) %>% summarise(n_E=n())%>%
+  ggplot(aes(x=x_E,y=n_E)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+
+###
+#    e  hasWon    n_E
+#  <dbl> <fct>  <int>
+#1     1 0        118
+#2     1 1        453
+#3     2 0          5
+#4     2 1         22
+#5     3 1          3
+###
+
+#Baron
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_N=max(lostBaronNashor)) %>% group_by(x_N,hasWon) %>% summarise(n_N=n())%>%
+  ggplot(aes(x=x_N,y=n_N)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+
+
+#Riftherreld
+data_drake %>% group_by(gameId,hasWon) %>% summarise(x_R=max(lostRiftHerald)) %>% group_by(x_R,hasWon) %>% summarise(n_R=n())%>%
+  ggplot(aes(x=x_R,y=n_R)) +
+  geom_bar(stat = "identity")+
+  facet_wrap(~ hasWon, ncol = 2)
+#------------------------------------------------------------------------------------------------------
+
+#3) turret
+
+###
+#Blue win:   12539 games
+#Pulple win: 12373 games
+###
+
+data_turret <- data_lol %>% select(gameId,frame,hasWon,destroyedTopInhibitor:lostBotOuterTurret)
+
+# The time when destroyed each turret or 
+# which place's turret first destroyed? or  
+# how many?
+
+# outer Turret
+
+data_turret %>% filter(destroyedTopInhibitor==2)
+data_turret %>% filter( hasWon==1)
+
+data_turret %>% filter(destroyedTopOuterTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+
+data_Top1 <- data_turret %>% filter(destroyedTopOuterTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top1$d.time)
+
+data_Top0 <- data_turret %>% filter(destroyedTopOuterTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top0$d.time)
+
+
+###
+
+#70% win games
+#41.8% lose games
+
+#Top outer turret
+#lose:17.676732
+#win: 16.680579
+###
+
+data_Mid1 <- data_turret %>% filter(destroyedMidOuterTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid1$d.time)
+
+data_Mid0 <- data_turret %>% filter(destroyedMidOuterTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid0$d.time)
+
+###
+#72.9% win games
+#41.4% lose games
+
+#Mid outer turret
+#lose:18.376048
+#win: 16.817296
+
+###
+
+data_Bot1 <- data_turret %>% filter(destroyedBotOuterTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot1$d.time)
+
+data_Bot0 <- data_turret %>% filter(destroyedBotOuterTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot0$d.time)
+
+###
+#77.7% win games
+#39.5% lose games
+
+#Bot outer turret
+#lose:19.641498
+#win:17.777345
+###
+
+# inner Turret
+data_Top3 <- data_turret %>% filter(destroyedTopInnerTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top3$d.time)
+
+data_Top2 <- data_turret %>% filter(destroyedTopInnerTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top2$d.time)
+
+
+
+###
+
+#45.1% win games
+#11.7% lose games
+
+#Top outer turret
+#lose:22.94824
+#win: 22.414086
+
+###
+
+data_Mid3 <- data_turret %>% filter(destroyedMidInnerTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid3$d.time)
+
+data_Mid2 <- data_turret %>% filter(destroyedMidInnerTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid2$d.time)
+
+
+###
+
+#50.8% win games
+#11.2% lose games
+
+#Mid outer turret
+#lose:24.987013
+#win: 23.21349
+
+###
+
+data_Bot3<- data_turret %>% filter(destroyedBotInnerTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot3$d.time)
+
+data_Bot2 <- data_turret %>% filter(destroyedBotInnerTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot2$d.time)
+
+
+###
+#73.6% win games
+#17.8% lose games
+
+#Bot outer turret
+#lose:24.459582
+#win:22.070035
+###
+# Nexus Turret
+
+data_Top5 <- data_turret %>% filter(destroyedTopNexusTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top5$d.time)
+
+data_Top4 <- data_turret %>% filter(destroyedTopNexusTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Top4$d.time)
+
+
+###
+#21.4% win games
+#2.5% lose games
+
+#Top Nexus turret
+#lose:27.111111
+#win: 25.304833
+###
+
+data_Mid5 <- data_turret %>% filter(destroyedMidNexusTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid5$d.time)
+
+data_Mid4 <- data_turret %>% filter(destroyedMidNexusTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Mid4$d.time)
+
+
+
+###
+#28.1% win games
+#3.0% lose games
+
+#Mid Nexus turret
+#lose:28.231183
+#win: 25.88382
+###
+
+data_Bot5<- data_turret %>% filter(destroyedBotNexusTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot5$d.time)
+
+data_Bot4 <- data_turret %>% filter(destroyedBotNexusTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot4$d.time)
+
+
+
+
+###
+#65.3% win games
+#7.9% lose games
+
+#Bot Nexus turret
+#lose:27.644033
+#win:25.105655
+###
+
+#baseturret(Bot에만 존재)-쌍둥이
+data_Bot7 <- data_turret %>% filter(destroyedBotBaseTurret==1 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot7$d.time)
+
+
+data_Bot6 <- data_turret %>% filter(destroyedBotBaseTurret==1 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot6$d.time)
+
+#2개파괴
+data_Bot7_2 <- data_turret %>% filter(destroyedBotBaseTurret==2 & hasWon==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot7_2$d.time)
+
+data_Bot6_2 <- data_turret %>% filter(destroyedBotBaseTurret==2 & hasWon==0) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_Bot6_2$d.time)
+
+
+data_turret %>% filter(destroyedMidBaseTurret==1)
+
+###
+#Bot Base turret1
+#24.9% win games
+#1.3% lose games
+
+
+
+#lose:30.357143
+#win:27.508144
+
+#Bot Base turret 2(both)
+
+#25.9% win games
+#0.3% lose games
+
+#lose:32.44898
+#win:28.130126
+
+
+
+###
+
+
+#Lost turret(lost 추가 여부판단)
+
+
+#------------------------------------------------------------------------------------------------------
+
+
+
+
+data_MidInhibitor <- data_turret %>% filter(destroyedMidInhibitor==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_MidInhibitor$d.time)
+
+data_BotInhibitor <- data_turret %>% filter(destroyedBotInhibitor==1) %>% 
+  group_by(gameId,hasWon) %>% 
+  summarise(d.time=min(frame))
+mean(data_BotInhibitor$d.time)
+
+###
+#Inhibitor 
+
+
+#1. TopInhibitor
+#Average: 27.06088 min
+
+#2. MidInhibitor
+#Average: 27.34279 min
+
+#3. BottomInhibitor
+#Average:26.711
+
+
+
+###
+#------------------------------------------------------------------------------------------------------
+
+
+#kills / Deaths / Assists
+data_kill <- data_lol %>% select(gameId,frame,hasWon,kills:assists)
+
+#To know KDA at the end of the game, Find the play time of each game
+data_kda <- data_kill %>% group_by(gameId) %>% summarise(frame=max(frame))
+#inner join with  original data
+data_KDA <- inner_join(data_kda,data_kill)
+#Win game kill
+data_KDA %>% filter(hasWon==1) %>%
+  ggplot(aes(x=frame,y=kills)) +
+  geom_point(stat = "identity")
+
+
+#Lose game kill
+data_KDA %>% filter(hasWon==0) %>%
+  ggplot(aes(x=frame,y=kills)) +
+  geom_point(stat = "identity")
+
+#Both kill
+data_KDA %>%
+  ggplot(aes(x=frame,y=kills,color=hasWon)) +
+  geom_point(stat = "identity")
+
+#Win game death
+data_KDA %>% filter(hasWon==1) %>%
+  ggplot(aes(x=frame,y=deaths)) +
+  geom_point(stat = "identity")
+
+
+#Lose game death
+data_KDA %>% filter(hasWon==0) %>%
+  ggplot(aes(x=frame,y=deaths)) +
+  geom_point(stat = "identity")
+
+#Both death
+data_KDA %>%
+  ggplot(aes(x=frame,y=deaths,color=hasWon)) +
+  geom_point(stat = "identity")
+
+
+#Win game assist
+data_KDA %>% filter(hasWon==1) %>%
+  ggplot(aes(x=frame,y=assists)) +
+  geom_point(stat = "identity")
+
+
+#Lose game assist
+data_KDA %>% filter(hasWon==0) %>%
+  ggplot(aes(x=frame,y=assists)) +
+  geom_point(stat = "identity")
+
+#Both assist
+data_KDA %>%
+  ggplot(aes(x=frame,y=assists,color=hasWon)) +
+  geom_point(stat = "identity")
+
+data_KDA %>% filter(hasWon==1) %>% summarise(mean(kills))
+
+data_KDA %>% filter(hasWon==0) %>% summarise(mean(kills))
+
+data_KDA %>% filter(hasWon==1) %>% summarise(mean(deaths))
+
+data_KDA %>% filter(hasWon==0) %>% summarise(mean(deaths))
+
+data_KDA %>% filter(hasWon==1) %>% summarise(mean(assists))
+
+data_KDA %>% filter(hasWon==0) %>% summarise(mean(assists))
+
+
+###
+#Win
+#kills:30.7
+#deaths:19.7
+#assists:44.7
+
+#lose
+#kills:20.2
+#deaths:31.1
+#assists:28.9
+###
+
+#------------------------------------------------------------------------------------------------------
+
+#wards
+
+data_wards <- data_lol %>% select(gameId,frame,hasWon,wardsPlaced:wardsLost)
+
+# last time
+jj<-data_wards %>% group_by(gameId,hasWon) %>% summarise(frame=max(frame))
+
+join_wards <- inner_join(jj,data_wards)
+
+join_wards %>% ggplot(aes(x=frame,y=wardsPlaced,color=hasWon))+
+  geom_point(stat = "identity")
+
+join_win_wards <- join_wards %>% filter(hasWon==1)
+join_lose_wards <- join_wards %>% filter(hasWon==0)
+
+mean(join_win_wards$wardsPlaced)
+mean(join_lose_wards$wardsPlaced)
+mean(join_win_wards$wardsDestroyed)
+mean(join_lose_wards$wardsDestroyed)
+mean(join_win_wards$wardsLost)
+mean(join_lose_wards$wardsLost)
+
+
+###
+#Placed(win) 83.49159
+#Placed(lose) 81.02263
+
+#Destroyed(win) 17.57261
+#Destroyed(lose) 16.32183
+
+#Lost(win) 15.41869
+#Lost(lose) 17.91732
+
+###
+```
